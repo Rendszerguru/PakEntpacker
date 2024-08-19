@@ -1,13 +1,12 @@
-﻿namespace PakReaderExe.Compression;
+namespace PakReaderExe.Compression;
 using System.IO.Compression;
 
 static class Zlib
 {
-	public static byte[] Decompress(byte[] data)
+    public static byte[] Decompress(byte[] data)
     {
         byte[] buffer = new byte[data.Length - 2];
         Buffer.BlockCopy(data, 2, buffer, 0, buffer.Length);
-
 
         using MemoryStream decompressedStream = new();
         using MemoryStream compressStream = new(buffer);
@@ -20,16 +19,19 @@ static class Zlib
     {
         pr.Skip(2);
 
-        using FileStream decompressedStream = File.Create(dst);
-        DeflateStream deflateStream = new(pr.BaseStream, CompressionMode.Decompress);
-        for (int bytesRead = 0; bytesRead < expectedSize;)
+        using (FileStream decompressedStream = File.Create(dst))
+        using (DeflateStream deflateStream = new(pr.BaseStream, CompressionMode.Decompress, leaveOpen: true))
         {
-            int toRead = 1000;
-            if (bytesRead + toRead > expectedSize) toRead = expectedSize - bytesRead;
-            byte[] buffer = new byte[toRead];
-            deflateStream.Read(buffer, 0, toRead);
-            decompressedStream.Write(buffer, 0, toRead);
-            bytesRead += toRead;
+            byte[] buffer = new byte[1000];
+            int bytesReadTotal = 0;
+            int bytesRead;
+
+            while (bytesReadTotal < expectedSize &&
+                   (bytesRead = deflateStream.Read(buffer, 0, Math.Min(buffer.Length, expectedSize - bytesReadTotal))) > 0)
+            {
+                decompressedStream.Write(buffer, 0, bytesRead);
+                bytesReadTotal += bytesRead;
+            }
         }
     }
 }
