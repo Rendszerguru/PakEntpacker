@@ -1,5 +1,5 @@
 Version 1.0.2
-The following features would yield better results when extracting .pak files containing errors: \n
+The following features would yield better results when extracting .pak files containing errors:
 
 Checks for safe reading conditions.
 Reads a UTF-8 string with error handling.
