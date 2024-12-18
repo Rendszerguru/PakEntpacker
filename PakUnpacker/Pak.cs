@@ -60,23 +60,18 @@ class Pak
 			long posEntries = pr.Pos();
 			while (pr.Pos() - posEntries < entriesSize)
 			{
+				long previousPos = pr.Pos();
+
 				try
 				{
-					// Check if there's enough data to read
 					if (!pr.CanRead(2))
-					{
-						//Console.WriteLine("Warning: Can't read further as the stream end is reached.");
 						break;
-					}
 
 					EntryType entryType = (EntryType)pr.ReadByte();
 					int entryNameLength = pr.ReadByte();
 
 					if (!pr.CanRead(entryNameLength))
-					{
-						Console.WriteLine("Warning: The entry name is too long for the remaining data.");
 						break;
-					}
 
 					string entryName = pr.ReadStringUtf8(entryNameLength);
 
@@ -92,7 +87,8 @@ class Pak
 				catch (Exception ex)
 				{
 					Console.WriteLine($"Error while reading an entry: {ex.Message}");
-					break; // Exit the loop on error
+					pr.BaseStream.Position = previousPos;
+					break;
 				}
 			}
 		}
@@ -101,6 +97,7 @@ class Pak
 			Console.WriteLine($"Error while processing the entries: {ex.Message}");
 		}
 	}
+
 
 	public void ReadEntriesFromDirectory(string dirName, PakReader pr)
 	{
@@ -114,22 +111,18 @@ class Pak
 
 		for (int i = 0; i < childCount; i++)
 		{
+			long previousPos = pr.Pos();
+
 			try
 			{
 				if (!pr.CanRead(2))
-				{
-					Console.WriteLine("Warning: The directory entry is too short.");
 					break;
-				}
 
 				EntryType entryType = (EntryType)pr.ReadByte();
 				int entryNameLength = pr.ReadByte();
 
 				if (!pr.CanRead(entryNameLength))
-				{
-					Console.WriteLine("Warning: The directory entry name is too long.");
 					break;
-				}
 
 				string entryName = dirName + "\\" + pr.ReadStringUtf8(entryNameLength);
 
@@ -149,6 +142,7 @@ class Pak
 			catch (Exception ex)
 			{
 				Console.WriteLine($"Error while reading a directory entry: {ex.Message}");
+				pr.BaseStream.Position = previousPos;
 				break;
 			}
 		}
@@ -165,31 +159,36 @@ class Pak
 				string? dir = Path.GetDirectoryName(dst + "\\" + entry.name);
 				if (dir is not null) Directory.CreateDirectory(dir);
 
+				if (entry.offset + entry.size > pr.BaseStream.Length)
+				{
+					Console.WriteLine($"Warning: Entry '{entry.name}' exceeds file size. Skipping.");
+					continue;
+				}
+
+				pr.BaseStream.Position = entry.offset;
+
 				if (entry.compression == PakEntryFile.CompressionType.Zlib)
 				{
 					try
 					{
-						pr.BaseStream.Position = entry.offset;
 						Compression.Zlib.Decompress(pr, entry.originalSize, dst + "\\" + entry.name);
 					}
 					catch
 					{
 						Console.WriteLine($"Error during Zlib decompression: {entry.name}");
-						pr.BaseStream.Position = entry.offset;
 						File.WriteAllBytes(dst + "\\" + entry.name + "_Error", pr.ReadBytes(entry.size));
 					}
 				}
 				else
 				{
-					pr.BaseStream.Position = entry.offset;
 					File.WriteAllBytes(dst + "\\" + entry.name, pr.ReadBytes(entry.size));
 				}
 			}
 			catch (Exception ex)
 			{
 				Console.WriteLine($"Error while extracting a file ({entry.name}): {ex.Message}");
-				continue;
 			}
 		}
 	}
+
 }
