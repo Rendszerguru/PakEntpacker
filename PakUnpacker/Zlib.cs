@@ -6,10 +6,14 @@ namespace PakReaderExe.Compression
 	{
 		public static byte[] Decompress(byte[] data)
 		{
-			// Check if the input data is valid
-			if (data.Length < 2)
+			if (data == null || data.Length < 2)
 			{
 				throw new InvalidDataException("The input data is too short for decompression.");
+			}
+
+			if (data[0] != 0x78)
+			{
+				throw new InvalidDataException("Invalid Zlib header.");
 			}
 
 			byte[] buffer = new byte[data.Length - 2];
@@ -23,23 +27,27 @@ namespace PakReaderExe.Compression
 				deflateStream.CopyTo(decompressedStream);
 				return decompressedStream.ToArray();
 			}
+			catch (InvalidDataException ex)
+			{
+				Console.WriteLine($"Invalid data during decompression: {ex.Message}");
+				throw;
+			}
 			catch (Exception ex)
 			{
 				Console.WriteLine($"Error during decompression: {ex.Message}");
 				throw;
 			}
 		}
-
 		public static void Decompress(PakReader pr, int expectedSize, string dst)
 		{
-			// Check if enough data is available for decompression
 			if (!pr.CanRead(2))
 			{
-				Console.WriteLine("Error: The input data is insufficient for decompression.");
+				Console.WriteLine("Error: Insufficient data to skip Zlib header.");
 				return;
 			}
 
-			pr.Skip(2); // Skip the Zlib header
+			long originalPosition = pr.Pos();
+			pr.Skip(2);
 
 			try
 			{
@@ -56,24 +64,40 @@ namespace PakReaderExe.Compression
 						decompressedStream.Write(buffer, 0, bytesRead);
 						bytesReadTotal += bytesRead;
 					}
+
+					if (bytesReadTotal < expectedSize)
+					{
+						Console.WriteLine($"Warning: Decompressed size ({bytesReadTotal} bytes) is smaller than expected ({expectedSize} bytes).");
+					}
 				}
-				// Console.WriteLine($"The file was successfully decompressed: {dst}");
+
+				Console.WriteLine($"The file was successfully decompressed: {dst}");
+			}
+			catch (InvalidDataException ex)
+			{
+				Console.WriteLine($"Invalid data during decompression: {ex.Message}");
+				pr.BaseStream.Position = originalPosition;
+				SaveCorruptedData(pr, expectedSize, dst);
 			}
 			catch (Exception ex)
 			{
 				Console.WriteLine($"Error during Zlib decompression: {ex.Message}");
+				pr.BaseStream.Position = originalPosition;
+				SaveCorruptedData(pr, expectedSize, dst);
+			}
+		}
 
-				// Save corrupted data with an error file
-				try
-				{
-					pr.BaseStream.Position = pr.Pos(); // Reset position to before the error
-					File.WriteAllBytes(dst + "_Error", pr.ReadBytes(expectedSize));
-					Console.WriteLine($"Corrupted data saved: {dst}_Error");
-				}
-				catch (Exception innerEx)
-				{
-					Console.WriteLine($"Error during corrupted data saving: {innerEx.Message}");
-				}
+		private static void SaveCorruptedData(PakReader pr, int expectedSize, string dst)
+		{
+			try
+			{
+				byte[] corruptedData = pr.ReadBytes(expectedSize);
+				File.WriteAllBytes(dst + "_Error", corruptedData);
+				Console.WriteLine($"Corrupted data saved: {dst}_Error");
+			}
+			catch (Exception innerEx)
+			{
+				Console.WriteLine($"Error while saving corrupted data: {innerEx.Message}");
 			}
 		}
 	}
