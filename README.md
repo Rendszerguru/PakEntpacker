@@ -8,7 +8,7 @@ The following features would yield better results when extracting .pak files con
 
 ## **Version 1.0.0**
 
-Modified version of the Enfusion pak unpacker created by youarebamboozled.
+Modified version of the Enfusion pak unpacker created by FlipperPlz.
 
 When assigned to a pak file, pressing Enter or double-clicking will unpack both the specified pak file and all other pak files within the same directory.
 
