@@ -1,22 +1,21 @@
-## **Version 1.0.5**
-* **Added interactive File Dialog**: If no `.pak` files are found in the directory or passed as arguments, the program now opens a Windows file picker instead of closing immediately.
-* **Improved Threading for UI**: Implemented STA (Single-Threaded Apartment) mode to ensure the file dialog opens reliably on all Windows systems.
-* [cite_start]**Upgraded to .NET 8.0**: Migrated the project from .NET 6.0 to .NET 8.0 (LTS) for better performance, long-term support, and improved security[cite: 1].
-* **Refactored Logic Priority**: Established a clear processing order: Command-line arguments first (Drag & Drop/Association), then local directory files, and finally the manual File Dialog.
+# PakEntpacker v1.0.6
 
-## **Version 1.0.2**
+A high-performance tool for extracting Enfusion engine `.pak` files, optimized for .NET 8.0.
 
-The following features would yield better results when extracting .pak files containing errors:
+## Key Features
+* **Multi-threaded Unpacking**: Simultaneously processes multiple files using all CPU cores.
+* **Memory-Efficient**: Streaming decompression ensures stable extraction of massive archives.
+* **Intelligent Workflow**: 
+    1. Supports **Drag & Drop** directly onto the EXE.
+    2. Auto-scans the local folder for `.pak` files.
+    3. Opens an **Interactive File Dialog** if no files are found.
+* **Robust Error Handling**: Automatically saves corrupted data blocks for debugging instead of crashing.
 
-- **Checks for safe reading conditions.**
-- **Reads a UTF-8 string with error handling.**
-- **Handles reading errors and invalid characters.**
+## Usage
+* **Automatic**: Place `PakEntpacker.exe` in your game folder and run it.
+* **Manual**: Run the EXE in an empty folder to open the file picker.
+* **Quick**: Drag any `.pak` file and drop it onto the icon.
 
-## **Version 1.0.0**
-
-Modified version of the Enfusion pak unpacker created by FlipperPlz.
-
-Drag a .pak file onto the executable or assign it to the tool; pressing Enter or double-clicking will unpack the selected .pak file along with all other .pak files in the same directory.
-
-### **Fixed:**
-The original Enfusion pak unpacker was truncating the end of files when decompressing `localization.conf` files.
+## Requirements
+* Windows OS
+* [.NET 8.0 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)
