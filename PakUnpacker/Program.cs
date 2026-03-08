@@ -4,49 +4,50 @@ using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
 using System.Threading;
+using System.Threading.Tasks; // Added for multi-threading support
 
 // Display the application's version
 string version = Assembly.GetExecutingAssembly()
-    .GetName()
-    .Version?
-    .ToString(3) ?? "1.0.5";
+	.GetName()
+	.Version?
+	.ToString(3) ?? "1.0.6";
 
 Console.WriteLine($"Application Version: {version}");
 
 // 1. PRIORITY: Command line argument (e.g. file drag & drop onto the EXE)
 if (args.Length > 0 && File.Exists(args[0]))
 {
-    ProcessFile(args[0]);
+	ProcessFile(args[0]);
 }
 else
 {
-    // 2. PRIORITY: Find all .pak files in the current directory
-    string[] pakFiles = Directory.GetFiles(Directory.GetCurrentDirectory(), "*.pak");
+	// 2. PRIORITY: Find all .pak files in the current directory
+	string[] pakFiles = Directory.GetFiles(Directory.GetCurrentDirectory(), "*.pak");
 
-    if (pakFiles.Length > 0)
-    {
-        // Iterate over each .pak file found locally
-        foreach (string pakPath in pakFiles)
-        {
-            ProcessFile(pakPath);
-        }
-    }
-    else
-    {
-        // 3. PRIORITY: Manual selection if no files found (Dialog)
-        Console.WriteLine("No '.pak' files found in the directory. Please select one manually!");
+	if (pakFiles.Length > 0)
+	{
+		// MULTI-THREADED: Iterate over each .pak file found locally using all CPU cores
+		Parallel.ForEach(pakFiles, pakPath =>
+		{
+			ProcessFile(pakPath);
+		});
+	}
+	else
+	{
+		// 3. PRIORITY: Manual selection if no files found (Dialog)
+		Console.WriteLine("No '.pak' files found in the directory. Please select one manually!");
 
-        string? selectedFile = ShowDialog();
+		string? selectedFile = ShowDialog();
 
-        if (!string.IsNullOrEmpty(selectedFile))
-        {
-            ProcessFile(selectedFile);
-        }
-        else
-        {
-            Console.WriteLine("Operation cancelled. No file selected.");
-        }
-    }
+		if (!string.IsNullOrEmpty(selectedFile))
+		{
+			ProcessFile(selectedFile);
+		}
+		else
+		{
+			Console.WriteLine("Operation cancelled. No file selected.");
+		}
+	}
 }
 
 Console.WriteLine("\nDone! Press any key to exit...");
@@ -56,53 +57,54 @@ Console.ReadKey();
 
 static void ProcessFile(string path)
 {
-    try
-    {
-        // Check if the file extension is .pak
-        if (Path.GetExtension(path).ToLower() != ".pak")
-        {
-            Console.WriteLine($"Skipping: {Path.GetFileName(path)} (not a .pak file)");
-            return;
-        }
+	try
+	{
+		// Check if the file extension is .pak
+		if (Path.GetExtension(path).ToLower() != ".pak")
+		{
+			Console.WriteLine($"Skipping: {Path.GetFileName(path)} (not a .pak file)");
+			return;
+		}
 
-        Console.WriteLine($"Unpacking: {path}...");
+		// Show which thread is working on which file for better clarity in multi-threaded mode
+		Console.WriteLine($"Unpacking: {path}...");
 
-        // Create a new Pak object for the current file
-        Pak pak = new Pak(path);
+		// Create a new Pak object for the current file
+		Pak pak = new Pak(path);
 
-        // Extract the data block to a directory with the same name as the .pak file
-        string outputDir = Path.ChangeExtension(path, null);
-        pak.ExtractDataBlock(outputDir);
+		// Extract the data block to a directory with the same name as the .pak file
+		string outputDir = Path.ChangeExtension(path, null);
+		pak.ExtractDataBlock(outputDir);
 
-        Console.WriteLine($"Successfully extracted to: {outputDir}");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"ERROR while processing {Path.GetFileName(path)}: {ex.Message}");
-    }
+		Console.WriteLine($"Successfully extracted to: {outputDir}");
+	}
+	catch (Exception ex)
+	{
+		Console.WriteLine($"ERROR while processing {Path.GetFileName(path)}: {ex.Message}");
+	}
 }
 
 static string? ShowDialog()
 {
-    string? selectedPath = null;
+	string? selectedPath = null;
 
-    // We use a separate Thread with STA state to ensure the dialog opens correctly
-    Thread thread = new Thread(() =>
-    {
-        using OpenFileDialog openFileDialog = new OpenFileDialog();
-        openFileDialog.Filter = "Pak files (*.pak)|*.pak";
-        openFileDialog.Title = "Select a .pak file to unpack";
-        openFileDialog.InitialDirectory = Directory.GetCurrentDirectory();
+	// We use a separate Thread with STA state to ensure the dialog opens correctly
+	Thread thread = new Thread(() =>
+	{
+		using OpenFileDialog openFileDialog = new OpenFileDialog();
+		openFileDialog.Filter = "Pak files (*.pak)|*.pak";
+		openFileDialog.Title = "Select a .pak file to unpack";
+		openFileDialog.InitialDirectory = Directory.GetCurrentDirectory();
 
-        if (openFileDialog.ShowDialog() == DialogResult.OK)
-        {
-            selectedPath = openFileDialog.FileName;
-        }
-    });
+		if (openFileDialog.ShowDialog() == DialogResult.OK)
+		{
+			selectedPath = openFileDialog.FileName;
+		}
+	});
 
-    thread.SetApartmentState(ApartmentState.STA);
-    thread.Start();
-    thread.Join();
+	thread.SetApartmentState(ApartmentState.STA);
+	thread.Start();
+	thread.Join();
 
-    return selectedPath;
+	return selectedPath;
 }
