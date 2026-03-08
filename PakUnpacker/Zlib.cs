@@ -38,6 +38,7 @@ namespace PakReaderExe.Compression
 				throw;
 			}
 		}
+
 		public static void Decompress(PakReader pr, int expectedSize, string dst)
 		{
 			if (!pr.CanRead(2))
@@ -54,7 +55,8 @@ namespace PakReaderExe.Compression
 				using (FileStream decompressedStream = File.Create(dst))
 				using (DeflateStream deflateStream = new(pr.BaseStream, CompressionMode.Decompress, leaveOpen: true))
 				{
-					byte[] buffer = new byte[1000];
+					// MEMORY-EFFICIENT: Using an 8KB buffer for streaming decompression
+					byte[] buffer = new byte[8192];
 					int bytesReadTotal = 0;
 					int bytesRead;
 
@@ -91,8 +93,20 @@ namespace PakReaderExe.Compression
 		{
 			try
 			{
-				byte[] corruptedData = pr.ReadBytes(expectedSize);
-				File.WriteAllBytes(dst + "_Error", corruptedData);
+				// MEMORY-EFFICIENT: Stream the corrupted data to disk instead of loading it entirely into RAM
+				using (FileStream fs = File.Create(dst + "_Error"))
+				{
+					byte[] buffer = new byte[8192];
+					int remaining = expectedSize;
+					while (remaining > 0)
+					{
+						int toRead = Math.Min(buffer.Length, remaining);
+						int read = pr.Read(buffer, 0, toRead);
+						if (read <= 0) break;
+						fs.Write(buffer, 0, read);
+						remaining -= read;
+					}
+				}
 				Console.WriteLine($"Corrupted data saved: {dst}_Error");
 			}
 			catch (Exception innerEx)
