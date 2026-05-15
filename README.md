@@ -1,4 +1,4 @@
-# 📦 PakEntpacker v1.0.6
+# 📦 PakEntpacker v1.0.7
 
 A high-performance tool for extracting Enfusion engine `.pak` files, optimized for .NET 8.0.
 
