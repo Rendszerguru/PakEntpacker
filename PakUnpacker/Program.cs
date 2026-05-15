@@ -5,48 +5,56 @@ using System.Reflection;
 using System.Windows.Forms;
 using System.Threading;
 using System.Threading.Tasks; // Added for multi-threading support
+using System.Collections.Generic; // Added for HashSet
 
 // Display the application's version
 string version = Assembly.GetExecutingAssembly()
 	.GetName()
 	.Version?
-	.ToString(3) ?? "1.0.6";
+	.ToString(3) ?? "1.0.7";
 
 Console.WriteLine($"Application Version: {version}");
 
-// 1. PRIORITY: Command line argument (e.g. file drag & drop onto the EXE)
+// Use a HashSet to avoid processing the same file twice
+HashSet<string> filesToProcess = new HashSet<string>();
+
+// 1. PRIORITY: Command line argument (e.g. file drag & drop onto the EXE or File Association)
 if (args.Length > 0 && File.Exists(args[0]))
 {
-	ProcessFile(args[0]);
+	filesToProcess.Add(args[0]);
+}
+
+// 2. PRIORITY: Find all .pak files in the current directory (Automatic mode)
+string[] localPakFiles = Directory.GetFiles(Directory.GetCurrentDirectory(), "*.pak");
+foreach (string file in localPakFiles)
+{
+	filesToProcess.Add(file);
+}
+
+// Check if we found any files through arguments or local scan
+if (filesToProcess.Count > 0)
+{
+	// MULTI-THREADED: Iterate over each .pak file found using all CPU cores
+	Parallel.ForEach(filesToProcess, pakPath =>
+	{
+		ProcessFile(pakPath);
+	});
 }
 else
 {
-	// 2. PRIORITY: Find all .pak files in the current directory
-	string[] pakFiles = Directory.GetFiles(Directory.GetCurrentDirectory(), "*.pak");
+	// 3. PRIORITY: Manual selection if no files found (Dialog)
+	Console.WriteLine("No '.pak' files found in the directory. Please select one manually!");
 
-	if (pakFiles.Length > 0)
+	string? selectedFile = ShowDialog();
+
+	if (!string.IsNullOrEmpty(selectedFile))
 	{
-		// MULTI-THREADED: Iterate over each .pak file found locally using all CPU cores
-		Parallel.ForEach(pakFiles, pakPath =>
-		{
-			ProcessFile(pakPath);
-		});
+		// In manual mode, we only process the specifically selected file
+		ProcessFile(selectedFile);
 	}
 	else
 	{
-		// 3. PRIORITY: Manual selection if no files found (Dialog)
-		Console.WriteLine("No '.pak' files found in the directory. Please select one manually!");
-
-		string? selectedFile = ShowDialog();
-
-		if (!string.IsNullOrEmpty(selectedFile))
-		{
-			ProcessFile(selectedFile);
-		}
-		else
-		{
-			Console.WriteLine("Operation cancelled. No file selected.");
-		}
+		Console.WriteLine("Operation cancelled. No file selected.");
 	}
 }
 
